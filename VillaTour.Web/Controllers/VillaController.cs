@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using VillaTour.Application.Common.Interfaces;
 using VillaTour.Domain.Entities;
 using VillaTour.Infrastructure.Data;
 using static System.Collections.Specialized.BitVector32;
@@ -7,14 +8,16 @@ namespace VillaTour.Web.Controllers
 {
     public class VillaController : Controller
     {
-        private readonly ApplicationDbContext _db;
-        public VillaController(ApplicationDbContext db)
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly IWebHostEnvironment _webHostEnvironment;   
+        public VillaController(IUnitOfWork unitOfWork, IWebHostEnvironment webHostEnvironment)
         {
-            _db = db;
+            _unitOfWork = unitOfWork;
+            _webHostEnvironment = webHostEnvironment;
         }
         public IActionResult Index()
         {
-            var villas = _db.Villas.ToList();
+            var villas = _unitOfWork.Villa.GetAll();
             return View(villas);
         }
 
@@ -32,9 +35,23 @@ namespace VillaTour.Web.Controllers
             }
             if (ModelState.IsValid)
             {
+                if(obj.Image != null)
+                {
+                    string fileName = Guid.NewGuid().ToString()+ Path.GetExtension(obj.Image.FileName);
+                    string imagePath = Path.Combine(_webHostEnvironment.WebRootPath, @"images/VillaImage");
 
-                _db.Villas.Add(obj);
-                _db.SaveChanges();
+                    using var fileStream = new FileStream(Path.Combine(imagePath, fileName), FileMode.Create);
+                    obj.Image.CopyTo(fileStream);
+
+                    obj.ImageUrl = @"\images\VillaImage\"+ fileName; 
+
+                }
+                else
+                {
+                    obj.ImageUrl = "https://placehold.co/600x400";
+                }
+                _unitOfWork.Villa.Add(obj);
+                _unitOfWork.Save();
                 //_villaService.CreateVilla(obj);
                 TempData["success"] = "The villa has been created successfully.";
                 return RedirectToAction(nameof(Index));
@@ -44,7 +61,7 @@ namespace VillaTour.Web.Controllers
 
         public IActionResult Update(int villaId)
         {
-            Villa? obj = _db.Villas.FirstOrDefault(x => x.Id == villaId);
+            Villa? obj = _unitOfWork.Villa.Get(x => x.Id == villaId);
             //Villa? obj = _villaService.GetVillaById(villaId);
             if (obj == null)
             {      
@@ -58,8 +75,30 @@ namespace VillaTour.Web.Controllers
         {
             if (ModelState.IsValid && obj.Id > 0)
             {
-                _db.Villas.Update(obj);
-                _db.SaveChanges();
+                if (obj.Image != null)
+                {
+                    string fileName = Guid.NewGuid().ToString() + Path.GetExtension(obj.Image.FileName);
+                    string imagePath = Path.Combine(_webHostEnvironment.WebRootPath, @"images/VillaImage");
+
+                    if (!string.IsNullOrEmpty(obj.ImageUrl))
+                    {
+                        var oldImagePath = Path.Combine(_webHostEnvironment.WebRootPath,obj.ImageUrl.TrimStart('\\'));
+
+                        if (System.IO.File.Exists(oldImagePath))
+                        {
+                            System.IO.File.Delete(oldImagePath);
+                        }
+                    }
+
+                    using var fileStream = new FileStream(Path.Combine(imagePath, fileName), FileMode.Create);
+                    obj.Image.CopyTo(fileStream);
+
+                    obj.ImageUrl = @"\images\VillaImage\" + fileName;
+
+                }
+
+                _unitOfWork.Villa.Update(obj);
+                _unitOfWork.Save();
                 //_villaService.UpdateVilla(obj);
                 TempData["success"] = "The villa has been updated successfully.";
                 return RedirectToAction(nameof(Index));
@@ -69,7 +108,7 @@ namespace VillaTour.Web.Controllers
 
         public IActionResult Delete(int villaId)
         {
-            Villa? obj = _db.Villas.FirstOrDefault(x => x.Id == villaId);
+            Villa? obj = _unitOfWork.Villa.Get(x => x.Id == villaId);
             //Villa? obj = _villaService.GetVillaById(villaId);
             if (obj is null)
             {
@@ -81,11 +120,20 @@ namespace VillaTour.Web.Controllers
         [HttpPost]
         public IActionResult Delete(Villa obj)
         {
-            Villa? objFormDb = _db.Villas.FirstOrDefault(u=>u.Id == obj.Id);
+            Villa? objFormDb = _unitOfWork.Villa.Get(u=>u.Id == obj.Id);
             if (objFormDb is not null)
             {
-                _db.Villas.Remove(objFormDb);
-                _db.SaveChanges();
+                if (!string.IsNullOrEmpty(objFormDb.ImageUrl))
+                {
+                    var oldImagePath = Path.Combine(_webHostEnvironment.WebRootPath, objFormDb.ImageUrl.TrimStart('\\'));
+
+                    if (System.IO.File.Exists(oldImagePath))
+                    {
+                        System.IO.File.Delete(oldImagePath);
+                    }
+                }
+                _unitOfWork.Villa.Remove(objFormDb);
+                _unitOfWork.Save();
                 //_villaService.UpdateVilla(obj);
                 TempData["success"] = "The villa has been Deleted successfully.";
                 return RedirectToAction(nameof(Index));

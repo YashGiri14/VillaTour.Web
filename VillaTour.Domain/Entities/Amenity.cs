@@ -1,24 +1,26 @@
-﻿using System;
+﻿using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 
 namespace VillaTour.Domain.Entities
 {
-    public class VillaNumber
+    public class Amenity
     {
-        [Key, DatabaseGenerated(DatabaseGeneratedOption.None)]
-        [Display(Name = "Villa Number")]
-        public int Villa_Number { get; set; }
+        [Key]
+        public int Id { get; set; }
+
+        public required string Name { get; set; }
+        public string? Description { get; set; }
+
 
         [ForeignKey("Villa")]
         public int VillaId { get; set; }
-       [ValidateNever]
+        [ValidateNever]
         public Villa Villa { get; set; }
-        public string? SpecialDetails { get; set; }
     }
 }
